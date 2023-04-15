@@ -65,12 +65,15 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->all();
+        $data = $request->only(['from_language_id','immediate','due_time',
+            'due_date','customer_phone_type', 'customer_physical_type'
+            ,'duration','gender','certified','job_for','job_type', 'due'
+            ,'b_created_at','by_admin','customer_town','customer_type'
+            ,'will_expire_at']);
 
         $response = $this->repository->store($request->__authenticatedUser, $data);
 
         return response($response);
-
     }
 
     /**
@@ -80,6 +83,10 @@ class BookingController extends Controller
      */
     public function update($id, Request $request)
     {
+        $validated = $request->validate([
+            'id' => 'required|exists:jobs,id',
+        ]);
+
         $data = $request->all();
         $cuser = $request->__authenticatedUser;
         $response = $this->repository->updateJob($id, array_except($data, ['_token', 'submit']), $cuser);
@@ -93,8 +100,13 @@ class BookingController extends Controller
      */
     public function immediateJobEmail(Request $request)
     {
+        $validated = $request->validate([
+            'user_email_job_id' => 'required|exists:jobs,id',
+        ]);
+
         $adminSenderEmail = config('app.adminemail');
-        $data = $request->all();
+        $data = $request->only(['user_type', 'user_email_job_id', 'user_email'
+            , 'reference', 'address', 'instructions', 'town']);
 
         $response = $this->repository->storeJobEmail($data);
 
@@ -107,6 +119,10 @@ class BookingController extends Controller
      */
     public function getHistory(Request $request)
     {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
+
         if($user_id = $request->get('user_id')) {
 
             $response = $this->repository->getUsersJobsHistory($user_id, $request);
