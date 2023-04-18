@@ -35,16 +35,18 @@ class BookingController extends Controller
      */
     public function index(Request $request)
     {
-        if($user_id = $request->get('user_id')) {
-
+        $response = [];
+        $user_id = $request->get('user_id');
+        if($user_id) {
             $response = $this->repository->getUsersJobs($user_id);
-
         }
+        // this shouldn't be in .env file env('ADMIN_ROLE_ID'), instead use roles table from database or configure this in app.php and get it from config()
         elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
         {
             $response = $this->repository->getAll($request);
         }
 
+        //$response variable isn't initialized, error here !
         return response($response);
     }
 
@@ -65,11 +67,19 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->only(['from_language_id','immediate','due_time',
-            'due_date','customer_phone_type', 'customer_physical_type'
-            ,'duration','gender','certified','job_for','job_type', 'due'
-            ,'b_created_at','by_admin','customer_town','customer_type'
-            ,'will_expire_at']);
+        $data = $request->all();
+        $rules = [
+            'from_language_id' => 'required',
+            'due_date' => 'required_if:immediate,no',
+            'due_time' => 'required_if:immediate,no',
+            'customer_phone_type' => 'required_if:immediate,no',
+            'customer_physical_type' => 'required_if:immediate,no',
+            'duration' => 'required',
+            'immediate' => 'required',
+            'job_for' => 'required|array',
+            'job_type' => 'required'
+        ];
+        $validator = $this->repository->validate($data, $rules);
 
         $response = $this->repository->store($request->__authenticatedUser, $data);
 
@@ -83,13 +93,14 @@ class BookingController extends Controller
      */
     public function update($id, Request $request)
     {
-        $validated = $request->validate([
-            'id' => 'required|exists:jobs,id',
-        ]);
-
         $data = $request->all();
-        $cuser = $request->__authenticatedUser;
-        $response = $this->repository->updateJob($id, array_except($data, ['_token', 'submit']), $cuser);
+        $rules = [
+            'id' => 'required|exists:jobs,id',
+        ];
+        $validator = $this->repository->validate($data, $rules);
+
+        $user = $request->__authenticatedUser;
+        $response = $this->repository->updateJob($id, array_except($data, ['_token', 'submit']), $user);
 
         return response($response);
     }
@@ -100,13 +111,13 @@ class BookingController extends Controller
      */
     public function immediateJobEmail(Request $request)
     {
-        $validated = $request->validate([
+        $data = $request->all();
+        $rules = [
             'user_email_job_id' => 'required|exists:jobs,id',
-        ]);
-
-        $adminSenderEmail = config('app.adminemail');
-        $data = $request->only(['user_type', 'user_email_job_id', 'user_email'
-            , 'reference', 'address', 'instructions', 'town']);
+            'user_type' => 'required',
+            'user_email' => 'email',
+        ];
+        $validator = $this->repository->validate($data, $rules);
 
         $response = $this->repository->storeJobEmail($data);
 
@@ -119,12 +130,13 @@ class BookingController extends Controller
      */
     public function getHistory(Request $request)
     {
-        $validated = $request->validate([
+        $data = $request->all();
+        $rules = [
             'user_id' => 'required|exists:users,id',
-        ]);
+        ];
+        $validator = $this->repository->validate($data, $rules);
 
-        if($user_id = $request->get('user_id')) {
-
+        if($user_id = $request->has('user_id')) {
             $response = $this->repository->getUsersJobsHistory($user_id, $request);
             return response($response);
         }
@@ -141,6 +153,12 @@ class BookingController extends Controller
         $data = $request->all();
         $user = $request->__authenticatedUser;
 
+        $rules = [
+            'user_id' => 'required|exists:users,id',
+            'job_id' => 'required|exists:jobs,id',
+        ];
+        $validator = $this->repository->validate($data, $rules);
+
         $response = $this->repository->acceptJob($data, $user);
 
         return response($response);
@@ -148,10 +166,17 @@ class BookingController extends Controller
 
     public function acceptJobWithId(Request $request)
     {
-        $data = $request->get('job_id');
+        $data = $request->all();
         $user = $request->__authenticatedUser;
 
-        $response = $this->repository->acceptJobWithId($data, $user);
+        $rules = [
+            'job_id' => 'required|exists:jobs,id',
+        ];
+        $validator = $this->repository->validate($data, $rules);
+
+        $job_id = $request->get('job_id');
+
+        $response = $this->repository->acceptJobWithId($job_id, $user);
 
         return response($response);
     }
